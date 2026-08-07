@@ -32,9 +32,10 @@ RuneLite event bus / tracker state
 ### Components
 
 1. **Plugin lifecycle and configuration**  
-   A standalone plugin owns enablement, selected event types, destinations,
-   filtering, and lifecycle cleanup. It should use RuneLite's `Config` system
-   and injected shared `OkHttpClient`, as existing client plugins do.
+   This must be an external plugin; the public RuneLite client is not modified.
+   The plugin owns enablement, selected event types, destinations, filtering,
+   and lifecycle cleanup. It should use RuneLite's `Config` system and injected
+   shared `OkHttpClient`, as existing client plugins do.
 2. **Event detectors**  
    Detectors subscribe to public RuneLite events and/or expose narrowly scoped
    integration points. A birdhouse detector should emit only after state
@@ -55,10 +56,10 @@ RuneLite event bus / tracker state
 ## Birdhouse event flow
 
 The existing Time Tracking plugin already derives birdhouse state and stores a
-completion timestamp in `BirdHouseTracker`. The preferred first integration is
-to expose a small, read-only event or service boundary from time tracking
-rather than duplicating varp and region interpretation in the notification
-plugin.
+completion timestamp in `BirdHouseTracker`. The preferred integration requires
+a stable public event from Time Tracking that an external plugin can subscribe
+to. The notification plugin cannot add that event by changing the public
+RuneLite client.
 
 The detector should distinguish at least:
 
@@ -68,11 +69,11 @@ The detector should distinguish at least:
 - **Reset or unknown:** clear pending state without sending a misleading
   notification.
 
-If a public integration point is not appropriate, the standalone plugin can
-observe existing events and maintain its own state, but this duplicates
-time-tracking logic and is more vulnerable to login/profile and partial-varp
-updates. The implementation should not modify the existing tracker merely to
-send a notification.
+If no suitable public Time Tracking event exists, identify another supported
+public API surface; do not modify the public client or duplicate private tracker
+internals. Duplicating varp and region interpretation is more vulnerable to
+login/profile and partial-varp updates and should be treated as a fallback
+investigation, not an assumption.
 
 ## Configuration and UX
 
@@ -112,9 +113,9 @@ the same event:
 }
 ```
 
-The character name and world should be omitted by default or explicitly
-disabled by configuration. Payloads should contain no credentials, chat
-contents, or unnecessary gameplay telemetry.
+Include the character name when accessible, falling back to the RuneLite
+profile name. World and other details remain configurable. Payloads should
+contain no credentials, chat contents, or unnecessary gameplay telemetry.
 
 ## Delivery behavior
 
@@ -219,14 +220,14 @@ where practical, and make the exact outbound data visible in the UI.
 6. Evaluate a generic callback adapter and distribution model after the fixed
    providers have demonstrated safe configuration and delivery behavior.
 
-## Open decisions
+## Confirmed decisions
 
-- Should the first version be an external plugin or a built-in RuneLite
-  feature?
-- Is a stable public event needed from Time Tracking, or should notification
-  support live inside that plugin?
-- Should queued events survive a client restart, or should delivery remain
-  in-memory and best effort?
-- Which account/profile identifier, if any, is useful enough to justify
-  including it in a notification?
-- Should provider credentials be stored per RuneLite profile?
+- The first version is an external plugin; the public RuneLite client will not
+  be modified.
+- The preferred integration is a stable public event from Time Tracking. If
+  unavailable, investigate another supported public API rather than changing
+  the client.
+- Delivery is in-memory and best effort; queued events do not survive restart.
+- Include the character name when accessible, otherwise use the RuneLite
+  profile name.
+- Store provider credentials per RuneLite profile.
